@@ -1,0 +1,120 @@
+# 每日任务
+
+name: bilibili-daily-task
+
+
+on:
+  workflow_dispatch: # 手动触发
+  schedule: # 计划任务触发
+    - cron: '14 0 * * *' 
+    # cron表达式，时区是UTC时间，比我们早8小时，如上所表示的是每天0点0分（16+8=24点整）
+    # 建议每个人通过设置名称为 Production 的 GitHub Environments 来设定为自己的目标运行时间（详细设置方法见文档说明）
+
+env:
+  ASPNETCORE_ENVIRONMENT: ${{secrets.ENV}} # 运行环境
+  Ray_BiliBiliCookies__1: ${{secrets.COOKIESTR}}
+  Ray_BiliBiliCookies__2: ${{secrets.COOKIESTR2}}
+  Ray_BiliBiliCookies__3: ${{secrets.COOKIESTR3}}
+  # 推送：
+  Ray_Notification__IsSingleAccountSingleNotify: false
+  Ray_Serilog__WriteTo__3__Args__botToken: ${{secrets.PUSHTGTOKEN}} # Telegram
+  Ray_Serilog__WriteTo__3__Args__chatId: ${{secrets.PUSHTGCHATID}}
+  Ray_Serilog__WriteTo__3__Args__restrictedToMinimumLevel: ${{secrets.PUSHTGLEVEL}}
+  Ray_Serilog__WriteTo__4__Args__webHookUrl: ${{secrets.PUSHWEIXINURL}} # 企业微信
+  Ray_Serilog__WriteTo__4__Args__restrictedToMinimumLevel: ${{secrets.PUSHWEIXINLEVEL}}
+  Ray_Serilog__WriteTo__5__Args__webHookUrl: ${{secrets.PUSHDINGURL}} # 钉钉
+  Ray_Serilog__WriteTo__5__Args__restrictedToMinimumLevel: ${{secrets.PUSHDINGLEVEL}}
+  Ray_Serilog__WriteTo__6__Args__scKey: ${{secrets.PUSHSCKEY}} # Server酱
+  Ray_Serilog__WriteTo__6__Args__turboScKey: ${{secrets.PUSHSERVERTSCKEY}}
+  Ray_Serilog__WriteTo__6__Args__restrictedToMinimumLevel: ${{secrets.PUSHSERVERLEVEL}}
+  Ray_Serilog__WriteTo__7__Args__sKey: ${{secrets.PUSHCOOLSKEY}} # 酷推
+  Ray_Serilog__WriteTo__7__Args__restrictedToMinimumLevel: ${{secrets.PUSHCOOLLEVEL}}
+  Ray_Serilog__WriteTo__8__Args__api: ${{secrets.PUSHOTHERAPI}} # 自定义api
+  Ray_Serilog__WriteTo__8__Args__placeholder: ${{secrets.PUSHOTHERPLACEHOLDER}}
+  Ray_Serilog__WriteTo__8__Args__bodyJsonTemplate: ${{secrets.PUSHOTHERBODYJSONTEMPLATE}}
+  Ray_Serilog__WriteTo__8__Args__restrictedToMinimumLevel: ${{secrets.PUSHOTHERLEVEL}}
+  Ray_Serilog__WriteTo__9__Args__token: ${{secrets.PUSHPLUSTOKEN}} # PushPlus
+  Ray_Serilog__WriteTo__9__Args__topic: ${{secrets.PUSHPLUSTOPIC}}
+  Ray_Serilog__WriteTo__9__Args__channel: ${{secrets.PUSHPLUSCHANNEL}}
+  Ray_Serilog__WriteTo__9__Args__webhook: ${{secrets.PUSHPLUSWEBHOOK}}
+  Ray_Serilog__WriteTo__9__Args__restrictedToMinimumLevel: ${{secrets.PUSHPLUSLEVEL}}
+  # 安全相关：
+  Ray_Security__IsSkipDailyTask: ${{secrets.ISSKIPDAILYTASK}}
+  Ray_Security__IntervalSecondsBetweenRequestApi: ${{secrets.INTERVALSECONDSBETWEENREQUESTAPI}}
+  Ray_Security__IntervalMethodTypes: ${{secrets.INTERVALMETHODTYPES}}
+  Ray_Security__UserAgent: ${{secrets.USERAGENT}}
+  Ray_Security__WebProxy: ${{secrets.WEBPROXY}}
+  Ray_Security__RandomSleepMaxMin: ${{secrets.RANDOMSLEEPMAXMIN}}
+  # 每日任务：
+  Ray_DailyTaskConfig__NumberOfCoins: ${{secrets.NUMBEROFCOINS}}
+  Ray_DailyTaskConfig__SaveCoinsWhenLv6: ${{secrets.SAVECOINSWHENLV6}}
+  Ray_DailyTaskConfig__SelectLike: ${{secrets.SELECTLIKE}}
+  Ray_DailyTaskConfig__SupportUpIds: ${{secrets.SUPPORTUPIDS}}
+  Ray_DailyTaskConfig__DayOfAutoCharge: ${{secrets.DAYOFAUTOCHARGE}}
+  Ray_DailyTaskConfig__AutoChargeUpId: ${{secrets.AUTOCHARGEUPID}}
+  Ray_DailyTaskConfig__ChargeComment: ${{secrets.CHARGECOMMENT}}
+  Ray_DailyTaskConfig__DayOfReceiveVipPrivilege: ${{secrets.DAYOFRECEIVEVIPPRIVILEGE}}
+  Ray_DailyTaskConfig__DayOfExchangeSilver2Coin: ${{secrets.DAYOFEXCHANGESILVER2COIN}}
+  Ray_DailyTaskConfig__DevicePlatform: ${{secrets.DEVICEPLATFORM}}
+  Ray_Serilog__WriteTo__0__Args__restrictedToMinimumLevel: ${{secrets.CONSOLELOGLEVEL}}
+  Ray_Serilog__WriteTo__0__Args__outputTemplate: ${{secrets.CONSOLELOGTEMPLATE}}         
+
+jobs:
+
+  pre-check:
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.check.outputs.result }} # 不能直接传递secrets的值，否则会被skip，需要转一下
+    steps:
+    - id: check
+      if: env.IsOpenDailyTask!='true'
+      run: |
+        echo "::set-output name=result::开启"
+
+  run-daily-task:
+
+    runs-on: ubuntu-latest
+    environment: Production
+    needs: pre-check
+    if: needs.pre-check.outputs.result=='开启'
+
+    steps:
+    # 设置服务器时区为东八区 
+    - name: Set time zone
+      run: sudo timedatectl set-timezone 'Asia/Shanghai'
+      
+    - uses: wang-task/cloudflare-warp-actions@main
+
+    # 检出
+    - uses: actions/checkout@v2
+
+    # .Net 环境
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.0.x
+ 
+    # 测试运行
+    - name: Test APP
+      run: |
+              export CURRENT_TIME=BiliBiliToolPro-daily-$(date +"%Y-%m-%d_%H-%M-%S")
+              cd ./src/Ray.BiliBiliTool.Console
+              echo "----------- ip 信息 ---------" >> "${CURRENT_TIME}.log"
+              sudo curl -s https://ipinfo.io/ | tee -a "${CURRENT_TIME}.log"
+              echo " ---------- end ------------" >> "${CURRENT_TIME}.log"
+              dotnet run --runTasks=Daily | tee -a "${CURRENT_TIME}.log"
+              git clone https://github.com/wang-task/logs.git
+              mv ./"${CURRENT_TIME}.log" ./logs/bilibili/BiliBiliToolPro/daily
+              echo "| [${CURRENT_TIME}.log](./${CURRENT_TIME}.log) |" >> ./logs/bilibili/BiliBiliToolPro/daily/index.md
+              cd logs
+              git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git config --local user.name "github-actions[bot]"
+              git add .
+              git commit -a  -m "机器人🤖-运行日志_BiliBiliToolPro-daily"
+    - name: Push changes
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.LOGS }}
+        branch: main
+        repository: 'wang-task/logs'
+        directory: './src/Ray.BiliBiliTool.Console/logs'
