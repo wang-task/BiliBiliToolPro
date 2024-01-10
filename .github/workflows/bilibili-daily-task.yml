@@ -102,7 +102,7 @@ jobs:
               echo "----------- ip 信息 ---------" >> "${CURRENT_TIME}.log"
               sudo curl -s https://ipinfo.io/ | tee -a "${CURRENT_TIME}.log"
               echo " ---------- end ------------" >> "${CURRENT_TIME}.log"
-              dotnet run --runTasks=Daily&VipBigPoint | tee -a "${CURRENT_TIME}.log"
+              dotnet run --runTasks=VipBigPoint | tee -a "${CURRENT_TIME}.log"
               git clone https://github.com/wang-task/logs.git
               mv ./"${CURRENT_TIME}.log" ./logs/bilibili/BiliBiliToolPro/daily
               echo "| [${CURRENT_TIME}.log](./${CURRENT_TIME}.log) |" >> ./logs/bilibili/BiliBiliToolPro/daily/index.md
